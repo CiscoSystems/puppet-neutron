@@ -83,16 +83,23 @@
 #   Min value is 0 and Max value is 16777215.
 #   Default to empty.
 #
+# [*enable_security_group*]
+#   (optionnal) Enable the security group API or not.
+#   Since the ML2 plugin can concurrently support different L2 agents (or other
+#   mechanisms) with different configurations, we need to set something to the
+#   firewall_driver flag to enable security group API.
+#   Defaults to false.
 
 class neutron::plugins::ml2 (
   $type_drivers          = ['local', 'flat', 'vlan', 'gre', 'vxlan'],
   $tenant_network_types  = ['local', 'flat', 'vlan', 'gre', 'vxlan'],
   $mechanism_drivers     = ['openvswitch', 'linuxbridge'],
   $flat_networks         = ['*'],
-  $network_vlan_ranges   = ['10:50'],
+  $network_vlan_ranges   = ['physnet1:1000:2999'],
   $tunnel_id_ranges      = ['20:100'],
   $vxlan_group           = '224.0.0.1',
-  $vni_ranges            = ['10:100']
+  $vni_ranges            = ['10:100'],
+  $enable_security_group = false
 ) {
 
   include neutron::params
@@ -101,6 +108,15 @@ class neutron::plugins::ml2 (
   validate_array($mechanism_drivers)
   if ! $mechanism_drivers {
     warning('Without networking mechanism driver, ml2 will not communicate with L2 agents')
+  }
+
+  # Some platforms do not have a dedicated ml2 plugin package
+  if $::neutron::params::ml2_server_package {
+    package { 'neutron-plugin-ml2':
+      ensure => present,
+      name   => $::neutron::params::ml2_server_package,
+    }
+    Package['neutron-plugin-ml2'] -> Neutron_plugin_ml2<||>
   }
 
   neutron::plugins::ml2::driver { $type_drivers:
@@ -145,6 +161,16 @@ class neutron::plugins::ml2 (
 
   if $::neutron::core_plugin != 'neutron.plugins.ml2.plugin.Ml2Plugin' {
     fail('ml2 plugin should be the core_plugin in neutron.conf')
+  }
+
+  if $enable_security_group {
+    neutron_plugin_ml2 {
+      'securitygroup/firewall_driver': value => $enable_security_group;
+    }
+  } else {
+    neutron_plugin_ml2 {
+      'securitygroup/firewall_driver': value => 'neutron.agent.firewall.NoopFirewallDriver';
+    }
   }
 
 }

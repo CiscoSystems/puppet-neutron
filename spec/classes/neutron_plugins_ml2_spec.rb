@@ -29,14 +29,15 @@ describe 'neutron::plugins::ml2' do
   end
 
   let :default_params do
-    { :type_drivers         => ['local', 'flat', 'vlan', 'gre', 'vxlan'],
-      :tenant_network_types => ['local', 'flat', 'vlan', 'gre', 'vxlan'],
-      :mechanism_drivers    => ['openvswitch', 'linuxbridge'],
-      :flat_networks        => ['*'],
-      :network_vlan_ranges  => ['10:50'],
-      :tunnel_id_ranges     => ['20:100'],
-      :vxlan_group          => '224.0.0.1',
-      :vni_ranges           => ['10:100'] }
+    { :type_drivers          => ['local', 'flat', 'vlan', 'gre', 'vxlan'],
+      :tenant_network_types  => ['local', 'flat', 'vlan', 'gre', 'vxlan'],
+      :mechanism_drivers     => ['openvswitch', 'linuxbridge'],
+      :flat_networks         => ['*'],
+      :network_vlan_ranges   => ['10:50'],
+      :tunnel_id_ranges      => ['20:100'],
+      :vxlan_group           => '224.0.0.1',
+      :vni_ranges            => ['10:100'],
+      :enable_security_group => false }
   end
 
   let :params do
@@ -58,8 +59,19 @@ describe 'neutron::plugins::ml2' do
       should contain_neutron_plugin_ml2('ml2/type_drivers').with_value(p[:type_drivers].join(','))
       should contain_neutron_plugin_ml2('ml2/tenant_network_types').with_value(p[:tenant_network_types].join(','))
       should contain_neutron_plugin_ml2('ml2/mechanism_drivers').with_value(p[:mechanism_drivers].join(','))
+      should contain_neutron_plugin_ml2('securitygroup/firewall_driver').with_value('neutron.agent.firewall.NoopFirewallDriver')
     end
 
+    it 'installs ml2 package (if any)' do
+      if platform_params.has_key?(:ml2_server_package)
+        should contain_package('neutron-plugin-ml2').with(
+          :name   => platform_params[:ml2_server_package],
+          :ensure => 'present'
+        )
+        should contain_package('neutron-plugin-ml2').with_before(/Neutron_plugin_ml2\[.+\]/)
+      end
+
+    end
 
     context 'configure ml2 with wrong core_plugin configured' do
       let :pre_condition do
@@ -190,11 +202,24 @@ describe 'neutron::plugins::ml2' do
          should contain_neutron_plugin_linuxbridge('vxlan/l2_population').with_value('true')
        end
      end
+
+     context 'when enabling security group' do
+       before :each do
+         params.merge!(:enable_security_group => true)
+       end
+       it 'should set firewall_driver to true' do
+         should contain_neutron_plugin_ml2('securitygroup/firewall_driver').with('value' => true)
+       end
+     end
   end
 
   context 'on Debian platforms' do
     let :facts do
       { :osfamily => 'Debian' }
+    end
+
+    let :platform_params do
+      {}
     end
 
     it_configures 'neutron plugin ml2'
@@ -203,6 +228,10 @@ describe 'neutron::plugins::ml2' do
   context 'on RedHat platforms' do
     let :facts do
       { :osfamily => 'RedHat' }
+    end
+
+    let :platform_params do
+      { :ml2_server_package => 'openstack-neutron-ml2' }
     end
 
     it_configures 'neutron plugin ml2'
