@@ -8,6 +8,12 @@
 #   (optional) Firewall driver for realizing neutron security group function.
 #   Defaults to 'neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver'.
 #
+# [*disableml2*]
+#   (required) Temporary fix to Ubuntu's packaging bug
+#   wherein ml2 config inclusion is hard-coded.
+#   Defaults to true.
+#
+
 class neutron::agents::ovs (
   $package_ensure       = 'present',
   $manage_service       = true,
@@ -22,11 +28,35 @@ class neutron::agents::ovs (
   $vxlan_udp_port       = 4789,
   $polling_interval     = 2,
   $firewall_driver      = 'neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver',
-  $veth_mtu             = undef
+  $veth_mtu             = undef,
+  $disableml2           = true,
 ) {
 
   include neutron::params
+  include neutron::plugins::ovs
   require vswitch::ovs
+
+  if $disableml2 {
+
+    file_line { 'comment init file2':
+      path  => '/etc/init/neutron-plugin-openvswitch-agent.conf',
+      line  => '#exec start-stop-daemon --start --chuid neutron --exec /usr/bin/neutron-openvswitch-agent -- --config-file=/etc/neutron/neutron.conf --config-file=/etc/neutron/plugins/ml2/ml2_conf.ini --log-file=/var/log/neutron/openvswitch-agent.log',
+      match => 'exec start-stop-daemon --start --chuid neutron --exec /usr/bin/neutron-openvswitch-agent -- --config-file=/etc/neutron/neutron.conf --config-file=/etc/neutron/plugins/ml2/ml2_conf.ini --log-file=/var/log/neutron/openvswitch-agent.log',
+      require => Package['neutron-plugin-openvswitch-agent'],
+    }
+
+    file_line { 'add modified exec to init2':
+      path    => '/etc/init/neutron-plugin-openvswitch-agent.conf',
+      line    => 'exec start-stop-daemon --start --chuid neutron --exec /usr/bin/neutron-openvswitch-agent -- --config-file=/etc/neutron/neutron.conf --log-file=/var/log/neutron/openvswitch-agent.log',
+      require => File_line['comment init file2'],
+    }
+
+    exec { 'bound neutron-plugin-openvswitch-agent2':
+      command => '/sbin/stop neutron-plugin-openvswitch-agent && sleep 1 && /sbin/start neutron-plugin-openvswitch-agent',
+      require => File_line['add modified exec to init2'],
+      unless  => '/bin/ps -ef | /bin/grep neutron-openvswitch-agent | /bin/grep -v grep | /bin/grep -v ml2',
+    }
+  }
 
   if $enable_tunneling and ! $local_ip {
     fail('Local ip for ovs agent must be set when tunneling is enabled')
