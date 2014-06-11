@@ -47,7 +47,7 @@ class neutron::agents::ovs (
 
     file_line { 'add modified exec to init2':
       path    => '/etc/init/neutron-plugin-openvswitch-agent.conf',
-      line    => 'exec start-stop-daemon --start --chuid neutron --exec /usr/bin/neutron-openvswitch-agent -- --config-file=/etc/neutron/neutron.conf --log-file=/var/log/neutron/openvswitch-agent.log',
+      line    => 'exec start-stop-daemon --start --chuid neutron --exec /usr/bin/neutron-openvswitch-agent -- --config-file=/etc/neutron/neutron.conf --config-file /etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini --log-file=/var/log/neutron/openvswitch-agent.log',
       require => File_line['comment init file2'],
     }
 
