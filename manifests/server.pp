@@ -189,26 +189,20 @@ class neutron::server (
       notify  => Service['neutron-server'],
     }
 
+    file_line { 'modify NEUTRON_PLUGIN_CONFIG setting':
+      path    => '/etc/default/neutron-server',
+      line    => 'NEUTRON_PLUGIN_CONFIG="/etc/neutron/plugin.ini"',
+      require => File_line['change default file'],
+      notify  => Service['neutron-server'],
+    }
+
     file_line { 'comment init file':
       path  => '/etc/init/neutron-plugin-openvswitch-agent.conf',
       line  => '#exec start-stop-daemon --start --chuid neutron --exec /usr/bin/neutron-openvswitch-agent -- --config-file=/etc/neutron/neutron.conf --config-file=/etc/neutron/plugins/ml2/ml2_conf.ini --log-file=/var/log/neutron/openvswitch-agent.log',
       match => 'exec start-stop-daemon --start --chuid neutron --exec /usr/bin/neutron-openvswitch-agent -- --config-file=/etc/neutron/neutron.conf --config-file=/etc/neutron/plugins/ml2/ml2_conf.ini --log-file=/var/log/neutron/openvswitch-agent.log',
       require => [ Package['neutron-plugin-openvswitch-agent'], File_line['change default file'] ],
     }
-
-    file_line { 'add modified exec to init':
-      path    => '/etc/init/neutron-plugin-openvswitch-agent.conf',
-      line    => 'exec start-stop-daemon --start --chuid neutron --exec /usr/bin/neutron-openvswitch-agent -- --config-file=/etc/neutron/neutron.conf --log-file=/var/log/neutron/openvswitch-agent.log',
-      require => File_line['comment init file'],
-    }
-
-    exec { 'bound neutron-plugin-openvswitch-agent':
-      command => '/sbin/stop neutron-plugin-openvswitch-agent && sleep 1 && /sbin/start neutron-plugin-openvswitch-agent',
-      require => File_line['add modified exec to init'],
-      unless  => '/bin/ps -ef | /bin/grep neutron-openvswitch-agent | /bin/grep -v grep | /bin/grep -v ml2',
-    }
   }
-
 
   Neutron_config<||>     ~> Service['neutron-server']
   Neutron_api_config<||> ~> Service['neutron-server']
