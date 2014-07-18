@@ -49,6 +49,12 @@ describe 'neutron' do
 
     end
 
+    it_configures 'with SSL enabled'
+    it_configures 'with SSL disabled'
+    it_configures 'with SSL wrongly configured'
+    it_configures 'with SSL socket options set'
+    it_configures 'with SSL socket options set with wrong parameters'
+    it_configures 'with SSL socket options set to false'
     it_configures 'with syslog disabled'
     it_configures 'with syslog enabled'
     it_configures 'with syslog enabled and custom settings'
@@ -132,8 +138,122 @@ describe 'neutron' do
     end
   end
 
+  shared_examples_for 'with SSL socket options set' do
+    before do
+      params.merge!(
+        :use_ssl         => true,
+        :cert_file       => '/path/to/cert',
+        :key_file        => '/path/to/key',
+        :ca_file         => '/path/to/ca'
+      )
+    end
+
+    it { should contain_neutron_config('DEFAULT/use_ssl').with_value('true') }
+    it { should contain_neutron_config('DEFAULT/ssl_cert_file').with_value('/path/to/cert') }
+    it { should contain_neutron_config('DEFAULT/ssl_key_file').with_value('/path/to/key') }
+    it { should contain_neutron_config('DEFAULT/ssl_ca_file').with_value('/path/to/ca') }
+  end
+
+  shared_examples_for 'with SSL socket options set with wrong parameters' do
+    before do
+      params.merge!(
+        :use_ssl         => true,
+        :key_file        => '/path/to/key',
+        :ca_file         => '/path/to/ca'
+      )
+    end
+
+    it_raises 'a Puppet::Error', /The cert_file parameter is required when use_ssl is set to true/
+  end
+
+  shared_examples_for 'with SSL socket options set to false' do
+    before do
+      params.merge!(
+        :use_ssl         => false,
+        :cert_file       => false,
+        :key_file        => false,
+        :ca_file         => false
+      )
+    end
+
+    it { should contain_neutron_config('DEFAULT/use_ssl').with_value('false') }
+    it { should contain_neutron_config('DEFAULT/ssl_cert_file').with_ensure('absent') }
+    it { should contain_neutron_config('DEFAULT/ssl_key_file').with_ensure('absent') }
+    it { should contain_neutron_config('DEFAULT/ssl_ca_file').with_ensure('absent') }
+  end
+
   shared_examples_for 'with syslog disabled' do
     it { should contain_neutron_config('DEFAULT/use_syslog').with_value(false) }
+  end
+
+  shared_examples_for 'with SSL enabled' do
+    before do
+      params.merge!(
+        :rabbit_use_ssl     => true,
+        :kombu_ssl_ca_certs => '/path/to/ssl/ca/certs',
+        :kombu_ssl_certfile => '/path/to/ssl/cert/file',
+        :kombu_ssl_keyfile  => '/path/to/ssl/keyfile',
+        :kombu_ssl_version  => 'SSLv3'
+      )
+    end
+
+    it do
+      should contain_neutron_config('DEFAULT/rabbit_use_ssl').with_value('true')
+      should contain_neutron_config('DEFAULT/kombu_ssl_ca_certs').with_value('/path/to/ssl/ca/certs')
+      should contain_neutron_config('DEFAULT/kombu_ssl_certfile').with_value('/path/to/ssl/cert/file')
+      should contain_neutron_config('DEFAULT/kombu_ssl_keyfile').with_value('/path/to/ssl/keyfile')
+      should contain_neutron_config('DEFAULT/kombu_ssl_version').with_value('SSLv3')
+    end
+  end
+
+  shared_examples_for 'with SSL disabled' do
+    before do
+      params.merge!(
+        :rabbit_use_ssl     => false,
+        :kombu_ssl_ca_certs => 'undef',
+        :kombu_ssl_certfile => 'undef',
+        :kombu_ssl_keyfile  => 'undef',
+        :kombu_ssl_version  => 'SSLv3'
+      )
+    end
+
+    it do
+      should contain_neutron_config('DEFAULT/rabbit_use_ssl').with_value('false')
+      should contain_neutron_config('DEFAULT/kombu_ssl_ca_certs').with_ensure('absent')
+      should contain_neutron_config('DEFAULT/kombu_ssl_certfile').with_ensure('absent')
+      should contain_neutron_config('DEFAULT/kombu_ssl_keyfile').with_ensure('absent')
+      should contain_neutron_config('DEFAULT/kombu_ssl_version').with_ensure('absent')
+    end
+  end
+
+  shared_examples_for 'with SSL wrongly configured' do
+    before do
+      params.merge!(
+        :rabbit_use_ssl     => true,
+        :kombu_ssl_ca_certs => 'undef',
+        :kombu_ssl_certfile => 'undef',
+        :kombu_ssl_keyfile  => 'undef'
+      )
+    end
+
+    context 'without required parameters' do
+
+      context 'without kombu_ssl_ca_certs parameter' do
+        before { params.delete(:kombu_ssl_ca_certs) }
+        it_raises 'a Puppet::Error', /The kombu_ssl_ca_certs parameter is required when rabbit_use_ssl is set to true/
+      end
+
+      context 'without kombu_ssl_certfile parameter' do
+        before { params.delete(:kombu_ssl_certfile) }
+        it_raises 'a Puppet::Error', /The kombu_ssl_certfile parameter is required when rabbit_use_ssl is set to true/
+      end
+
+      context 'without kombu_ssl_keyfile parameter' do
+        before { params.delete(:kombu_ssl_keyfile) }
+        it_raises 'a Puppet::Error', /The kombu_ssl_keyfile parameter is required when rabbit_use_ssl is set to true/
+      end
+    end
+
   end
 
   shared_examples_for 'with syslog enabled' do
