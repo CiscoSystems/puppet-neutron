@@ -13,19 +13,39 @@ define neutron::plugins::ml2::cisco::nexus_creds(
   $password,
   $servers,
   $ip_address,
-  $ssh_port
+  $ssh_port,
+  $nve_src_intf = undef,
+  $physnet      = undef,
 ) {
-
-  file {'/var/lib/neutron/.ssh':
-    ensure  => directory,
-    owner   => 'neutron',
-    require => Package['neutron-server']
+  # Ensure Neutron server is installed before configuring ssh keys
+  if ($::neutron::params::server_package) {
+    Package['neutron-server'] -> File['/var/lib/neutron/.ssh']
+    Package['neutron-server'] -> Exec["nexus_creds_${name}"]
+  } else {
+    Package['neutron'] -> File['/var/lib/neutron/.ssh']
+    Package['neutron'] -> Exec["nexus_creds_${name}"]
   }
 
-  exec {'nexus_creds':
-    unless  => "/bin/cat /var/lib/neutron/.ssh/known_hosts | /bin/grep ${username}",
+  if ! defined(File['/var/lib/neutron/.ssh']) {
+    file {'/var/lib/neutron/.ssh':
+      ensure  => directory,
+      owner   => 'neutron',
+    }
+  }
+
+  $check_known_hosts = "/bin/cat /var/lib/neutron/.ssh/known_hosts | /bin/grep ${ip_address}"
+
+  # Test to make sure switch is reachable before ssh-keyscan
+  exec {"ping_test_${name}":
+    unless  => $check_known_hosts,
+    command => "/usr/bin/ping -c 1 ${ip_address}",
+    user    => 'neutron'
+  }
+
+  exec {"nexus_creds_${name}":
+    unless  => $check_known_hosts,
     command => "/usr/bin/ssh-keyscan -t rsa ${ip_address} >> /var/lib/neutron/.ssh/known_hosts",
     user    => 'neutron',
-    require => [Package['neutron-server'], File['/var/lib/neutron/.ssh']]
+    require => [Exec["ping_test_${name}"], File['/var/lib/neutron/.ssh']]
   }
 }

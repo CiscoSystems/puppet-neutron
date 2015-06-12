@@ -1,0 +1,25 @@
+[ml2_cisco_ucsm]
+
+# Cisco UCS Manager IP address
+# ucsm_ip=1.1.1.1
+<%= "ucsm_ip = #{@ucsm_ip}" if defined?(@ucsm_ip)  %>
+
+# Username to connect to UCS Manager
+# ucsm_username=user
+<%= "ucsm_username = #{@ucsm_username}" if defined?(@ucsm_username) %>
+
+# Password to connect to UCS Manager
+# ucsm_password=password
+<%= "ucsm_password = #{@ucsm_password}" if defined?(@ucsm_password) %>
+
+# SR-IOV and VM-FEX vendors supported by this plugin
+# xxxx:yyyy represents vendor_id:product_id
+# supported_pci_devs = ['2222:3333', '4444:5555']
+<%= "supported_pci_devs = #{@supported_pci_devs}" \
+     if defined?(@supported_pci_devs) %>
+
+# Hostname to Service profile mapping for UCS Manager
+# controlled compute hosts
+# ucsm_host_list=Hostname1:Serviceprofile1, Hostname2:Serviceprofile2
+<%= "ucsm_host_list = #{@ucsm_host_list}" if defined?(@ucsm_host_list) %>
+
